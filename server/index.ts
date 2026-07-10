@@ -21,17 +21,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static files (frontend build)
-if (NODE_ENV === "production") {
-  const publicDir = path.join(process.cwd(), "dist", "public");
-  if (fs.existsSync(publicDir)) {
-    app.use(express.static(publicDir));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(publicDir, "index.html"));
-    });
-  }
-}
-
 // tRPC endpoint
 app.use(
   "/trpc",
@@ -44,6 +33,17 @@ app.use(
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Static files (frontend build)
+if (NODE_ENV === "production") {
+  const publicDir = path.join(process.cwd(), "dist", "public");
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(publicDir, "index.html"));
+    });
+  }
+}
 
 // Start server
 async function start() {
