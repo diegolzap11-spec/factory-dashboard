@@ -1,0 +1,12 @@
+import { useRef, useCallback } from "react";
+
+export function usePersistFn<T extends (...args: any[]) => any>(fn: T): T {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+
+  const persistFn = useCallback((...args: Parameters<T>) => {
+    return fnRef.current(...args);
+  }, []) as T;
+
+  return persistFn;
+}
