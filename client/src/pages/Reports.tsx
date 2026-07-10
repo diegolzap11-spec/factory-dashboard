@@ -1,301 +1,320 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
-import { BarChart3, TrendingUp, TrendingDown, Factory, Truck, Trash2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Factory, Truck, Package, Trash2, TrendingUp, TrendingDown, Box } from "lucide-react";
+import { HELMET_PRODUCTS, HELMET_COLORS } from "../const";
+import { useMemo } from "react";
 
 export default function Reports() {
-  const [dateRange, setDateRange] = useState<"7d" | "30d" | "custom">("30d");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
-
-  const startDate = useMemo(() => {
-    if (dateRange === "custom" && customStart) return new Date(customStart);
-    const d = new Date();
-    d.setDate(d.getDate() - (dateRange === "7d" ? 7 : 30));
-    return d;
-  }, [dateRange, customStart]);
-
-  const endDate = useMemo(() => {
-    if (dateRange === "custom" && customEnd) return new Date(customEnd);
-    return new Date();
-  }, [dateRange, customEnd]);
-
   const { data: products } = trpc.products.list.useQuery();
-  const { data: productionData } = trpc.reports.productionByRange.useQuery({ startDate, endDate });
-  const { data: shipmentsData } = trpc.reports.shipmentsByRange.useQuery({ startDate, endDate });
-  const { data: consumptionData } = trpc.reports.consumptionByRange.useQuery({ startDate, endDate });
+  const { data: allProduction } = trpc.production.getAll.useQuery();
+  const { data: allShipments } = trpc.shipments.getAll.useQuery();
+  const { data: allConsumption } = trpc.consumption.getAll.useQuery();
 
-  // Production by product
-  const productionByProduct = useMemo(() => {
-    if (!productionData || !products) return [];
-    return products.map((p) => ({
-      name: p.name,
-      cantidad: productionData.filter((r) => r.productTypeId === p.id).reduce((sum, r) => sum + r.quantity, 0),
-      fill: "#E5A820",
-    })).filter((p) => p.cantidad > 0);
-  }, [productionData, products]);
+  const form = useForm({});
 
-  // Shipments by product
-  const shipmentsByProduct = useMemo(() => {
-    if (!shipmentsData || !products) return [];
-    return products.map((p) => ({
-      name: p.name,
-      cantidad: shipmentsData.filter((r) => r.productTypeId === p.id).reduce((sum, r) => sum + r.quantity, 0),
-      fill: "#3B82F6",
-    })).filter((p) => p.cantidad > 0);
-  }, [shipmentsData, products]);
+  const helmetProducts = products?.filter((p) =>
+    HELMET_PRODUCTS.includes(p.name as (typeof HELMET_PRODUCTS)[number])
+  );
 
-  // Daily production chart
-  const dailyProduction = useMemo(() => {
-    if (!productionData) return [];
-    const days = {};
-    productionData.forEach((p) => {
-      const day = new Date(p.date).toLocaleDateString("es-ES", { month: "short", day: "numeric" });
-      days[day] = (days[day] || 0) + p.quantity;
+  const reportData = useMemo(() => {
+    const totalProduced = allProduction?.reduce((sum, p) => sum + p.quantity, 0) || 0;
+    const totalDispatched = allShipments?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+    const balance = totalProduced - totalDispatched;
+
+    const totalBagsConsumed = allConsumption?.reduce((sum, c) => sum + c.bagsConsumed, 0) || 0;
+    const totalKgConsumed = totalBagsConsumed * 25;
+
+    // Production by product and color
+    const productionByProduct: Record<string, Record<string, number>> = {};
+    allProduction?.forEach((p) => {
+      const productName = products?.find((pr) => pr.id === p.productTypeId)?.name || "Desconocido";
+      if (!productionByProduct[productName]) {
+        productionByProduct[productName] = {};
+      }
+      const color = p.color || "Sin color";
+      productionByProduct[productName][color] = (productionByProduct[productName][color] || 0) + p.quantity;
     });
-    return Object.entries(days).map(([date, cantidad]) => ({ date, cantidad }));
-  }, [productionData]);
 
-  // Consumption by category
-  const consumptionByCategory = useMemo(() => {
-    if (!consumptionData) return [];
-    const categories = {};
-    consumptionData.forEach((c) => {
-      categories[c.categoryId] = (categories[c.categoryId] || 0) + c.bagsConsumed;
+    // Shipments by product and color
+    const shipmentsByProduct: Record<string, Record<string, number>> = {};
+    allShipments?.forEach((s) => {
+      const productName = products?.find((pr) => pr.id === s.productTypeId)?.name || "Desconocido";
+      if (!shipmentsByProduct[productName]) {
+        shipmentsByProduct[productName] = {};
+      }
+      const color = s.color || "Sin color";
+      shipmentsByProduct[productName][color] = (shipmentsByProduct[productName][color] || 0) + s.quantity;
     });
-    return Object.entries(categories).map(([id, count]) => ({
-      name: id === "1" ? "Alta Calidad" : "Baja Calidad",
-      bolsas: count as number,
-      value: count as number,
-    }));
-  }, [consumptionData]);
 
-  const totalProduced = productionData?.reduce((sum, p) => sum + p.quantity, 0) || 0;
-  const totalShipped = shipmentsData?.reduce((sum, s) => sum + s.quantity, 0) || 0;
-  const totalConsumed = consumptionData?.reduce((sum, c) => sum + c.bagsConsumed, 0) || 0;
-  const balance = totalProduced - totalShipped;
+    // Stock by product and color
+    const stockByProduct: Record<string, Record<string, number>> = {};
+    for (const [productName, production] of Object.entries(productionByProduct)) {
+      stockByProduct[productName] = {};
+      for (const [color, qty] of Object.entries(production)) {
+        const shipped = shipmentsByProduct[productName]?.[color] || 0;
+        stockByProduct[productName][color] = qty - shipped;
+      }
+    }
 
-  const PIE_COLORS = ["#E5A820", "#3B82F6", "#10B981", "#EF4444", "#8B5CF6"];
-  const tooltipStyle = {
-    backgroundColor: 'rgba(22, 24, 29, 0.95)',
-    border: '1px solid rgba(229, 168, 32, 0.2)',
-    borderRadius: '12px',
-    padding: '8px 12px',
-    color: '#f0f0f0',
-    fontSize: '13px',
-  };
+    return {
+      totalProduced,
+      totalDispatched,
+      balance,
+      totalBagsConsumed,
+      totalKgConsumed,
+      productionByProduct,
+      shipmentsByProduct,
+      stockByProduct,
+    };
+  }, [allProduction, allShipments, allConsumption, products]);
+
+  const { totalProduced, totalDispatched, balance, totalBagsConsumed, totalKgConsumed, stockByProduct } = reportData;
 
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-fade-in">
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Reportes</h1>
-            <p className="text-sm text-muted-foreground">Análisis de producción, despachos y consumo</p>
-          </div>
-
-          {/* Date Range Selector */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant={dateRange === "7d" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange("7d")}
-              className={dateRange === "7d" ? "bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl" : "rounded-xl border-border/50 hover:bg-secondary/50 text-foreground"}
-            >
-              Últimos 7 días
-            </Button>
-            <Button
-              variant={dateRange === "30d" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange("30d")}
-              className={dateRange === "30d" ? "bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl" : "rounded-xl border-border/50 hover:bg-secondary/50 text-foreground"}
-            >
-              Últimos 30 días
-            </Button>
-            <Button
-              variant={dateRange === "custom" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange("custom")}
-              className={dateRange === "custom" ? "bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl" : "rounded-xl border-border/50 hover:bg-secondary/50 text-foreground"}
-            >
-              Personalizado
-            </Button>
-            {dateRange === "custom" && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="rounded-xl bg-input border border-border/50 px-3 py-2 text-foreground text-sm focus:ring-2 focus:ring-[#E5A820]/30 outline-none"
-                />
-                <span className="text-muted-foreground">-</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="rounded-xl bg-input border border-border/50 px-3 py-2 text-foreground text-sm focus:ring-2 focus:ring-[#E5A820]/30 outline-none"
-                />
-              </div>
-            )}
-          </div>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Reportes
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Resumen general de producción, despachos, balance y consumo de insumos
+          </p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-4 stagger-children">
           <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Producido</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Producido
+              </CardTitle>
               <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
                 <Factory className="h-4 w-4 text-[#E5A820]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#E5A820]">{totalProduced}</div>
-              <p className="text-xs text-muted-foreground mt-1">Unidades en el período</p>
+              <div className="text-3xl font-bold text-[#E5A820]">
+                {totalProduced}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Unidades producidas en total
+              </p>
             </CardContent>
           </Card>
 
           <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Despachado</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#3B82F6]/10 flex items-center justify-center">
-                <Truck className="h-4 w-4 text-[#3B82F6]" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Despachado
+              </CardTitle>
+              <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
+                <Truck className="h-4 w-4 text-[#E5A820]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#3B82F6]">{totalShipped}</div>
-              <p className="text-xs text-muted-foreground mt-1">Unidades en el período</p>
+              <div className="text-3xl font-bold text-[#E5A820]">
+                {totalDispatched}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Unidades despachadas en total
+              </p>
             </CardContent>
           </Card>
 
           <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Balance</CardTitle>
-              <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${balance >= 0 ? 'bg-[#10B981]/10' : 'bg-[#EF4444]/10'}`}>
-                {balance >= 0 ? <TrendingUp className="h-4 w-4 text-[#10B981]" /> : <TrendingDown className="h-4 w-4 text-[#EF4444]" />}
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Balance
+              </CardTitle>
+              <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-[#E5A820]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${balance >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>{balance > 0 ? `+${balance}` : balance}</div>
-              <p className="text-xs text-muted-foreground mt-1">Diferencia producción vs despacho</p>
+              <div className={`text-3xl font-bold ${balance >= 0 ? "text-[#E5A820]" : "text-red-500"}`}>
+                {balance >= 0 ? `+${balance}` : balance}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {balance >= 0 ? "Stock positivo" : "Stock negativo"}
+              </p>
             </CardContent>
           </Card>
 
           <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Consumo Insumos</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center">
-                <Trash2 className="h-4 w-4 text-[#8B5CF6]" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Consumo
+              </CardTitle>
+              <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
+                <Trash2 className="h-4 w-4 text-[#E5A820]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#8B5CF6]">{totalConsumed}</div>
-              <p className="text-xs text-muted-foreground mt-1">Bolsas (25 kg c/u) en el período</p>
+              <div className="text-3xl font-bold text-[#E5A820]">
+                {totalBagsConsumed}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {totalKgConsumed} kg consumidos
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Production by Product Chart */}
-        <Card className="border-border/40 bg-card/80 backdrop-blur-sm">
+        {/* Stock Detail Table */}
+        <Card className="border-border/40 bg-card/80 backdrop-blur-sm overflow-hidden">
           <CardHeader>
             <div className="flex items-center gap-2">
               <div className="h-5 w-1 rounded-full bg-[#E5A820]" />
-              <CardTitle className="text-foreground">Producción por Producto</CardTitle>
+              <CardTitle className="text-foreground">
+                Stock por Producto y Color
+              </CardTitle>
             </div>
+            <p className="text-sm text-muted-foreground">
+              Desglose del stock actual por cada casco y color
+            </p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={productionByProduct}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="cantidad" fill="#E5A820" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="rounded-xl border border-border/30 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/30 bg-secondary/30">
+                    <TableHead className="text-muted-foreground font-medium">
+                      Casco
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Color
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Producido
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Despachado
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Stock Actual
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {helmetProducts?.map((product) => (
+                    <>
+                      {HELMET_COLORS.map((color) => {
+                        const stock = stockByProduct[product.name]?.[color] || 0;
+                        const produced = Object.values(
+                          reportData.productionByProduct[product.name] || {}
+                        ).reduce((sum, v) => sum + v, 0);
+                        const dispatched = Object.values(
+                          reportData.shipmentsByProduct[product.name] || {}
+                        ).reduce((sum, v) => sum + v, 0);
+                        return (
+                          <TableRow
+                            key={`${product.name}-${color}`}
+                            className="border-border/20 hover:bg-secondary/20 transition-colors"
+                          >
+                            <TableCell className="text-foreground font-medium">
+                              {product.name}
+                            </TableCell>
+                            <TableCell className="text-foreground capitalize">
+                              {color}
+                            </TableCell>
+                            <TableCell className="text-[#E5A820] font-bold">
+                              {produced}
+                            </TableCell>
+                            <TableCell className="text-foreground">
+                              {dispatched}
+                            </TableCell>
+                            <TableCell className="font-bold">
+                              <span className={stock >= 0 ? "text-[#E5A820]" : "text-red-500"}>
+                                {stock >= 0 ? stock : stock}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Shipments by Product Chart */}
-        <Card className="border-border/40 bg-card/80 backdrop-blur-sm">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="h-5 w-1 rounded-full bg-[#3B82F6]" />
-              <CardTitle className="text-foreground">Despachos por Producto</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={shipmentsByProduct}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="cantidad" fill="#3B82F6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Charts Grid */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Daily Production */}
-          <Card className="border-border/40 bg-card/80 backdrop-blur-sm">
+        {/* Additional Summary */}
+        <div className="grid gap-4 md:grid-cols-2 stagger-children">
+          <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="h-5 w-1 rounded-full bg-[#E5A820]" />
-                <CardTitle className="text-foreground">Producción Diaria</CardTitle>
+                <CardTitle className="text-foreground">
+                  Resumen de Producción
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={dailyProduction}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="date" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="cantidad" fill="#E5A820" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Producido</span>
+                  <span className="text-lg font-bold text-[#E5A820]">{totalProduced} uds</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Despachado</span>
+                  <span className="text-lg font-bold text-foreground">{totalDispatched} uds</span>
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-foreground">Balance</span>
+                    <span className={`text-xl font-bold ${balance >= 0 ? "text-[#E5A820]" : "text-red-500"}`}>
+                      {balance >= 0 ? `+${balance}` : balance} uds
+                    </span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Consumption Pie */}
-          <Card className="border-border/40 bg-card/80 backdrop-blur-sm">
+          <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <div className="h-5 w-1 rounded-full bg-[#8B5CF6]" />
-                <CardTitle className="text-foreground">Consumo por Categoría</CardTitle>
+                <div className="h-5 w-1 rounded-full bg-[#E5A820]" />
+                <CardTitle className="text-foreground">
+                  Resumen de Consumo
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={consumptionByCategory}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {consumptionByCategory.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} />
-                </PieChart>
-              </ResponsiveContainer>
-              {consumptionByCategory.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  Sin datos de consumo en este período
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Bolsas Consumidas</span>
+                  <span className="text-lg font-bold text-[#E5A820]">{totalBagsConsumed} bolsas</span>
                 </div>
-              )}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Kg Consumidos</span>
+                  <span className="text-lg font-bold text-foreground">{totalKgConsumed} kg</span>
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Cada bolsa equivale a 25 kg de materia prima. El consumo se descuenta automáticamente del stock de insumos.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

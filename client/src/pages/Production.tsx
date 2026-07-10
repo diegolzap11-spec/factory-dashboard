@@ -2,10 +2,40 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,10 +43,11 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Plus, Factory, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { HELMET_COLORS, HELMET_PRODUCTS } from "../const";
 
 const productionFormSchema = z.object({
   productTypeId: z.number(),
-  color: z.string().optional(),
+  color: z.string().min(1, "El color es requerido"),
   quantity: z.number().min(1, "La cantidad debe ser mayor a 0"),
   date: z.coerce.date(),
   notes: z.string().optional(),
@@ -31,17 +62,23 @@ export default function Production() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data: products } = trpc.products.list.useQuery();
-  const { data: allProduction, refetch: refetchProduction } = trpc.production.getAll.useQuery();
+  const { data: allProduction, refetch: refetchProduction } =
+    trpc.production.getAll.useQuery();
   const createProductionMutation = trpc.production.create.useMutation();
   const updateProductionMutation = trpc.production.update.useMutation();
   const deleteProductionMutation = trpc.production.delete.useMutation();
+
+  // Filtrar solo productos de casco
+  const helmetProducts = products?.filter((p) =>
+    HELMET_PRODUCTS.includes(p.name as (typeof HELMET_PRODUCTS)[number])
+  );
 
   const form = useForm<ProductionFormValues>({
     resolver: zodResolver(productionFormSchema),
     defaultValues: {
       productTypeId: 0,
       color: "",
-      quantity: 0,
+      quantity: 1,
       date: new Date(),
       notes: "",
     },
@@ -67,8 +104,14 @@ export default function Production() {
         date: data.date,
         notes: data.notes,
       });
-      toast.success("Producción registrada correctamente");
-      form.reset({ productTypeId: 0, color: "", quantity: 0, date: new Date(), notes: "" });
+      toast.success("Producción registrada correctamente (stock actualizado)");
+      form.reset({
+        productTypeId: 0,
+        color: "",
+        quantity: 1,
+        date: new Date(),
+        notes: "",
+      });
       setOpen(false);
       refetchProduction();
     } catch (error) {
@@ -87,7 +130,7 @@ export default function Production() {
         date: data.date,
         notes: data.notes,
       });
-      toast.success("Producción actualizada correctamente. Stock recalculado.");
+      toast.success("Producción actualizada. Stock recalculado.");
       setEditOpen(false);
       setSelectedId(null);
       refetchProduction();
@@ -100,7 +143,7 @@ export default function Production() {
     if (!selectedId) return;
     try {
       await deleteProductionMutation.mutateAsync({ id: selectedId });
-      toast.success("Producción eliminada. Stock actualizado automáticamente.");
+      toast.success("Producción eliminada. Stock actualizado.");
       setDeleteOpen(false);
       setSelectedId(null);
       refetchProduction();
@@ -109,7 +152,7 @@ export default function Production() {
     }
   };
 
-  const handleEditClick = (record: any) => {
+  const handleEditClick = (record: (typeof allProduction)[number]) => {
     setSelectedId(record.id);
     editForm.reset({
       productTypeId: record.productTypeId,
@@ -134,18 +177,37 @@ export default function Production() {
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  const totalProduction = allProduction?.reduce((sum, p) => sum + p.quantity, 0) || 0;
+  const totalProduction =
+    allProduction?.reduce((sum, p) => sum + p.quantity, 0) || 0;
 
-  const formSelectClass = "w-full px-3 py-2 border border-border/50 rounded-xl bg-input text-foreground focus:ring-2 focus:ring-[#E5A820]/30 focus:border-[#E5A820]/50 outline-none transition-all";
-  const formInputClass = "rounded-xl bg-input border-border/50 focus:ring-2 focus:ring-[#E5A820]/30 focus:border-[#E5A820]/50";
+  const todayProduction = allProduction?.filter((p) => {
+    const prodDate = new Date(p.date);
+    const today = new Date();
+    return (
+      prodDate.getDate() === today.getDate() &&
+      prodDate.getMonth() === today.getMonth() &&
+      prodDate.getFullYear() === today.getFullYear()
+    );
+  }) || [];
+
+  const todayTotal = todayProduction.reduce((sum, p) => sum + p.quantity, 0);
+
+  const formSelectClass =
+    "w-full px-3 py-2 border border-border/50 rounded-xl bg-input text-foreground focus:ring-2 focus:ring-[#E5A820]/30 focus:border-[#E5A820]/50 outline-none transition-all";
+  const formInputClass =
+    "rounded-xl bg-input border-border/50 focus:ring-2 focus:ring-[#E5A820]/30 focus:border-[#E5A820]/50";
 
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-fade-in">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Registro de Producción</h1>
-            <p className="text-sm text-muted-foreground">Registra la cantidad producida diariamente</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Registro de Producción
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Registra la cantidad producida diariamente (se suma automáticamente al stock)
+            </p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -156,28 +218,37 @@ export default function Production() {
             </DialogTrigger>
             <DialogContent className="bg-card border-border/50">
               <DialogHeader>
-                <DialogTitle className="text-foreground">Registrar Producción</DialogTitle>
+                <DialogTitle className="text-foreground">
+                  Registrar Producción
+                </DialogTitle>
                 <DialogDescription className="text-muted-foreground">
                   Ingresa los detalles de la producción del día
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="productTypeId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-foreground">Tipo de Producto</FormLabel>
+                        <FormLabel className="text-foreground">
+                          Tipo de Casco
+                        </FormLabel>
                         <FormControl>
                           <select
                             {...field}
                             value={field.value}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(Number(e.target.value))
+                            }
                             className={formSelectClass}
                           >
-                            <option value="">Selecciona un producto</option>
-                            {products?.map((p) => (
+                            <option value="">Selecciona un casco</option>
+                            {helmetProducts?.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
                               </option>
@@ -195,7 +266,19 @@ export default function Production() {
                       <FormItem>
                         <FormLabel className="text-foreground">Color</FormLabel>
                         <FormControl>
-                          <Input placeholder="Ej: Amarillo, Blanco, Azul" {...field} className={formInputClass} />
+                          <select
+                            {...field}
+                            value={field.value}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            className={formSelectClass}
+                          >
+                            <option value="">Selecciona un color</option>
+                            {HELMET_COLORS.map((color) => (
+                              <option key={color} value={color}>
+                                {color.charAt(0).toUpperCase() + color.slice(1)}
+                              </option>
+                            ))}
+                          </select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -206,13 +289,17 @@ export default function Production() {
                     name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-foreground">Cantidad Producida</FormLabel>
+                        <FormLabel className="text-foreground">
+                          Cantidad Producida
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="number"
                             placeholder="0"
                             {...field}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(Number(e.target.value))
+                            }
                             className={formInputClass}
                           />
                         </FormControl>
@@ -230,8 +317,14 @@ export default function Production() {
                           <Input
                             type="date"
                             {...field}
-                            value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
-                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                            value={
+                              field.value instanceof Date
+                                ? field.value.toISOString().split("T")[0]
+                                : ""
+                            }
+                            onChange={(e) =>
+                              field.onChange(new Date(e.target.value))
+                            }
                             className={formInputClass}
                           />
                         </FormControl>
@@ -244,15 +337,24 @@ export default function Production() {
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-foreground">Notas (Opcional)</FormLabel>
+                        <FormLabel className="text-foreground">
+                          Notas (Opcional)
+                        </FormLabel>
                         <FormControl>
-                          <Input placeholder="Ej: Turno matutino, sin incidentes" {...field} className={formInputClass} />
+                          <Input
+                            placeholder="Ej: Turno matutino, sin incidentes"
+                            {...field}
+                            className={formInputClass}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full btn-premium bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl">
+                  <Button
+                    type="submit"
+                    className="w-full btn-premium bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl"
+                  >
                     Registrar
                   </Button>
                 </form>
@@ -261,52 +363,104 @@ export default function Production() {
           </Dialog>
         </div>
 
-        {/* Summary Card */}
-        <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Producción Total</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
-              <Factory className="h-4 w-4 text-[#E5A820]" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-[#E5A820]">{totalProduction}</div>
-            <p className="text-xs text-muted-foreground mt-1">Unidades producidas en total</p>
-          </CardContent>
-        </Card>
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-2 stagger-children">
+          <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Producción Total
+              </CardTitle>
+              <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
+                <Factory className="h-4 w-4 text-[#E5A820]" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-[#E5A820]">
+                {totalProduction}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Unidades producidas en total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="card-premium border-border/40 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Producción Hoy
+              </CardTitle>
+              <div className="h-8 w-8 rounded-lg bg-[#E5A820]/10 flex items-center justify-center">
+                <Factory className="h-4 w-4 text-[#E5A820]" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-[#E5A820]">
+                {todayTotal}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Unidades producidas hoy
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Production History Table */}
         <Card className="border-border/40 bg-card/80 backdrop-blur-sm overflow-hidden">
           <CardHeader>
             <div className="flex items-center gap-2">
               <div className="h-5 w-1 rounded-full bg-[#E5A820]" />
-              <CardTitle className="text-foreground">Historial de Producción</CardTitle>
+              <CardTitle className="text-foreground">
+                Historial de Producción
+              </CardTitle>
             </div>
-            <p className="text-sm text-muted-foreground">Últimos registros de producción</p>
+            <p className="text-sm text-muted-foreground">
+              Últimos registros de producción
+            </p>
           </CardHeader>
           <CardContent>
             <div className="rounded-xl border border-border/30 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/30 bg-secondary/30">
-                    <TableHead className="text-muted-foreground font-medium">Fecha</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Tipo de Producto</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Color</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Cantidad</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Notas</TableHead>
-                    <TableHead className="text-right text-muted-foreground font-medium">Acciones</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Fecha
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Casco
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Color
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Cantidad
+                    </TableHead>
+                    <TableHead className="text-muted-foreground font-medium">
+                      Notas
+                    </TableHead>
+                    <TableHead className="text-right text-muted-foreground font-medium">
+                      Acciones
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedProduction.length > 0 ? (
                     sortedProduction.map((record) => (
-                      <TableRow key={record.id} className="border-border/20 hover:bg-secondary/20 transition-colors">
+                      <TableRow
+                        key={record.id}
+                        className="border-border/20 hover:bg-secondary/20 transition-colors"
+                      >
                         <TableCell className="text-foreground">
                           {new Date(record.date).toLocaleDateString("es-ES")}
                         </TableCell>
-                        <TableCell className="text-foreground">{getProductName(record.productTypeId)}</TableCell>
-                        <TableCell className="text-foreground">{record.color || "-"}</TableCell>
-                        <TableCell className="font-bold text-[#E5A820]">{record.quantity}</TableCell>
+                        <TableCell className="text-foreground">
+                          {getProductName(record.productTypeId)}
+                        </TableCell>
+                        <TableCell className="text-foreground capitalize">
+                          {record.color || "-"}
+                        </TableCell>
+                        <TableCell className="font-bold text-[#E5A820]">
+                          {record.quantity}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {record.notes || "-"}
                         </TableCell>
@@ -336,7 +490,10 @@ export default function Production() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell
+                        colSpan={6}
+                        className="text-center text-muted-foreground py-8"
+                      >
                         No hay registros de producción
                       </TableCell>
                     </TableRow>
@@ -351,28 +508,37 @@ export default function Production() {
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent className="bg-card border-border/50">
             <DialogHeader>
-              <DialogTitle className="text-foreground">Editar Producción</DialogTitle>
+              <DialogTitle className="text-foreground">
+                Editar Producción
+              </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 Modifica los datos del registro. El stock se recalculará automáticamente.
               </DialogDescription>
             </DialogHeader>
             <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4">
+              <form
+                onSubmit={editForm.handleSubmit(onEdit)}
+                className="space-y-4"
+              >
                 <FormField
                   control={editForm.control}
                   name="productTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">Tipo de Producto</FormLabel>
+                      <FormLabel className="text-foreground">
+                        Tipo de Casco
+                      </FormLabel>
                       <FormControl>
                         <select
                           {...field}
                           value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value))
+                          }
                           className={formSelectClass}
                         >
-                          <option value="">Selecciona un producto</option>
-                          {products?.map((p) => (
+                          <option value="">Selecciona un casco</option>
+                          {helmetProducts?.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
                             </option>
@@ -390,7 +556,19 @@ export default function Production() {
                     <FormItem>
                       <FormLabel className="text-foreground">Color</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: Amarillo, Blanco, Azul" {...field} className={formInputClass} />
+                        <select
+                          {...field}
+                          value={field.value}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          className={formSelectClass}
+                        >
+                          <option value="">Selecciona un color</option>
+                          {HELMET_COLORS.map((color) => (
+                            <option key={color} value={color}>
+                              {color.charAt(0).toUpperCase() + color.slice(1)}
+                            </option>
+                          ))}
+                        </select>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -401,13 +579,17 @@ export default function Production() {
                   name="quantity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">Cantidad Producida</FormLabel>
+                      <FormLabel className="text-foreground">
+                        Cantidad Producida
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           placeholder="0"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value))
+                          }
                           className={formInputClass}
                         />
                       </FormControl>
@@ -425,8 +607,14 @@ export default function Production() {
                         <Input
                           type="date"
                           {...field}
-                          value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
-                          onChange={(e) => field.onChange(new Date(e.target.value))}
+                          value={
+                            field.value instanceof Date
+                              ? field.value.toISOString().split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            field.onChange(new Date(e.target.value))
+                          }
                           className={formInputClass}
                         />
                       </FormControl>
@@ -439,15 +627,24 @@ export default function Production() {
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">Notas (Opcional)</FormLabel>
+                      <FormLabel className="text-foreground">
+                        Notas (Opcional)
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: Turno matutino, sin incidentes" {...field} className={formInputClass} />
+                        <Input
+                          placeholder="Ej: Turno matutino, sin incidentes"
+                          {...field}
+                          className={formInputClass}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full btn-premium bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl">
+                <Button
+                  type="submit"
+                  className="w-full btn-premium bg-[#E5A820] hover:bg-[#d49a1c] text-black font-semibold rounded-xl"
+                >
                   Guardar Cambios
                 </Button>
               </form>
@@ -459,14 +656,21 @@ export default function Production() {
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogContent className="bg-card border-border/50">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-foreground">Eliminar Registro de Producción</AlertDialogTitle>
+              <AlertDialogTitle className="text-foreground">
+                Eliminar Registro de Producción
+              </AlertDialogTitle>
               <AlertDialogDescription className="text-muted-foreground">
                 Esta acción eliminará el registro y descontará automáticamente la cantidad del stock correspondiente. Esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="rounded-xl border-border/50">Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={onDelete} className="bg-red-600 hover:bg-red-700 rounded-xl">
+              <AlertDialogCancel className="rounded-xl border-border/50">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={onDelete}
+                className="bg-red-600 hover:bg-red-700 rounded-xl"
+              >
                 Eliminar
               </AlertDialogAction>
             </AlertDialogFooter>
