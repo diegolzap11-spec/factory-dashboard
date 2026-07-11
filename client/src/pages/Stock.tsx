@@ -50,11 +50,6 @@ export default function Stock() {
   const createStockMutation = trpc.stock.create.useMutation();
   const updateStockMutation = trpc.stock.update.useMutation();
 
-  // Filtrar solo productos de casco
-  const helmetProducts = products?.filter((p) =>
-    HELMET_PRODUCTS.includes(p.name as (typeof HELMET_PRODUCTS)[number])
-  );
-
   const form = useForm<StockFormValues>({
     resolver: zodResolver(stockFormSchema),
     defaultValues: {
@@ -63,6 +58,10 @@ export default function Stock() {
       quantity: 0,
     },
   });
+
+  const selectedProductId = form.watch("productTypeId");
+  const selectedProduct = products?.find(p => p.id === selectedProductId);
+  const isHelmet = selectedProduct && HELMET_PRODUCTS.includes(selectedProduct.name as any);
 
   const onSubmit = async (data: StockFormValues) => {
     try {
@@ -75,7 +74,7 @@ export default function Stock() {
       } else {
         await createStockMutation.mutateAsync({
           productTypeId: data.productTypeId,
-          color: data.color,
+          color: data.color || "Estándar",
           quantity: data.quantity,
         });
         toast.success("Stock registrado correctamente");
@@ -89,8 +88,8 @@ export default function Stock() {
     }
   };
 
-  // Agrupar stock por producto de casco
-  const groupedStock = helmetProducts?.map((product) => ({
+  // Agrupar stock por producto
+  const groupedStock = products?.map((product) => ({
     product,
     stock: allStock?.filter((s) => s.productTypeId === product.id) || [],
   })) || [];
@@ -141,73 +140,89 @@ export default function Stock() {
                         <FormLabel className="text-foreground">
                           Tipo de Casco
                         </FormLabel>
-                        <FormControl>
-                          <select
-                            {...field}
-                            value={field.value}
-                            onChange={(e) =>
-                              field.onChange(Number(e.target.value))
-                            }
-                            className={formSelectClass}
-                          >
-                            <option value="">Selecciona un casco</option>
-                            {helmetProducts?.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </FormControl>
+	                        <FormControl>
+	                          <select
+	                            {...field}
+	                            value={field.value}
+	                            onChange={(e) =>
+	                              field.onChange(Number(e.target.value))
+	                            }
+	                            className={formSelectClass}
+	                          >
+	                            <option value="">Selecciona un producto</option>
+	                            {products?.map((p) => (
+	                              <option key={p.id} value={p.id}>
+	                                {p.name}
+	                              </option>
+	                            ))}
+	                          </select>
+	                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Color (1-9)</FormLabel>
-                        <FormControl>
-                          <div className="space-y-4 py-2">
-                            <Slider
-                              min={1}
-                              max={9}
-                              step={1}
-                              value={[Number(HELMET_COLORS.find(c => c.name === field.value)?.id || 1)]}
-                              onValueChange={(vals) => {
-                                const color = HELMET_COLORS.find(c => c.id === vals[0].toString());
-                                if (color) field.onChange(color.name);
-                              }}
-                              className="py-4"
-                            />
-                            <div className="flex justify-between px-1">
-                              {HELMET_COLORS.map((color) => (
-                                <div
-                                  key={color.id}
-                                  className={`flex flex-col items-center gap-1 transition-all ${
-                                    field.value === color.name ? "scale-110" : "opacity-50"
-                                  }`}
-                                >
+	                  {isHelmet ? (
+                    <FormField
+                      control={form.control}
+                      name="color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-foreground">Color (1-9)</FormLabel>
+                          <FormControl>
+                            <div className="space-y-4 py-2">
+                              <Slider
+                                min={1}
+                                max={9}
+                                step={1}
+                                value={[Number(HELMET_COLORS.find(c => c.name === field.value)?.id || 1)]}
+                                onValueChange={(vals) => {
+                                  const color = HELMET_COLORS.find(c => c.id === vals[0].toString());
+                                  if (color) field.onChange(color.name);
+                                }}
+                                className="py-4"
+                              />
+                              <div className="flex justify-between px-1">
+                                {HELMET_COLORS.map((color) => (
                                   <div
-                                    className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
-                                    style={{ backgroundColor: color.hex }}
-                                  />
-                                  <span className="text-[10px] font-bold text-foreground">{color.id}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {field.value && (
-                              <div className="text-sm text-center font-medium text-[#E5A820]">
-                                Seleccionado: {field.value}
+                                    key={color.id}
+                                    className={`flex flex-col items-center gap-1 transition-all ${
+                                      field.value === color.name ? "scale-110" : "opacity-50"
+                                    }`}
+                                  >
+                                    <div
+                                      className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
+                                      style={{ backgroundColor: color.hex }}
+                                    />
+                                    <span className="text-[10px] font-bold text-foreground">{color.id}</span>
+                                  </div>
+                                ))}
                               </div>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                              {field.value && (
+                                <div className="text-sm text-center font-medium text-[#E5A820]">
+                                  Seleccionado: {field.value}
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-foreground">Color / Etiqueta</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: Estándar, Azul, etc." {...field} className={formInputClass} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="quantity"
@@ -261,43 +276,67 @@ export default function Stock() {
                 <CardTitle className="text-lg font-bold text-foreground">
                   {product.name}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Total en stock:{" "}
-                  <span className="font-bold text-[#E5A820]">
-                    {stock.reduce((sum, s) => sum + s.quantity, 0)}
-                  </span>
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-2 pb-5">
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {HELMET_COLORS.map((color) => {
-                    const item = stock.find(
-                      (s) => s.color.toLowerCase() === color.name.toLowerCase()
-                    );
-                    return (
-                      <div
-                        key={color.id}
-                        className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
-                            style={{
-                              backgroundColor: color.hex,
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground">
-                            {color.id}. {color.name}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-[#E5A820]">
-                          {item?.quantity || 0}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
+	                <p className="text-sm text-muted-foreground">
+	                  Total en stock:{" "}
+	                  <span className="font-bold text-[#E5A820]">
+	                    {stock.reduce((sum, s) => sum + s.quantity, 0)}
+	                  </span>
+	                </p>
+	              </CardHeader>
+	              <CardContent className="space-y-2 pb-5">
+	                {HELMET_PRODUCTS.includes(product.name as any) ? (
+	                  <div className="grid gap-2 sm:grid-cols-3">
+	                    {HELMET_COLORS.map((color) => {
+	                      const item = stock.find(
+	                        (s) => s.color.toLowerCase() === color.name.toLowerCase()
+	                      );
+	                      return (
+	                        <div
+	                          key={color.id}
+	                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
+	                        >
+	                          <div className="flex items-center gap-2.5">
+	                            <div
+	                              className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
+	                              style={{
+	                                backgroundColor: color.hex,
+	                              }}
+	                            />
+	                            <span className="text-sm font-medium text-foreground">
+	                              {color.id}. {color.name}
+	                            </span>
+	                          </div>
+	                          <span className="text-sm font-bold text-[#E5A820]">
+	                            {item?.quantity || 0}
+	                          </span>
+	                        </div>
+	                      );
+	                    })}
+	                  </div>
+	                ) : (
+	                  <div className="grid gap-2">
+	                    {stock.length > 0 ? (
+	                      stock.map((item) => (
+	                        <div
+	                          key={item.id}
+	                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
+	                        >
+	                          <span className="text-sm font-medium text-foreground">
+	                            {item.color}
+	                          </span>
+	                          <span className="text-sm font-bold text-[#E5A820]">
+	                            {item.quantity}
+	                          </span>
+	                        </div>
+	                      ))
+	                    ) : (
+	                      <div className="text-center py-4 text-muted-foreground text-sm">
+	                        Sin stock registrado
+	                      </div>
+	                    )}
+	                  </div>
+	                )}
+	              </CardContent>
             </Card>
           ))}
         </div>
