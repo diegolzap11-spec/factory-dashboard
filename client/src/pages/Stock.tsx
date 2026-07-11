@@ -62,20 +62,27 @@ export default function Stock() {
   const selectedProductId = form.watch("productTypeId");
   const selectedProduct = products?.find(p => p.id === selectedProductId);
   const isHelmet = selectedProduct && HELMET_PRODUCTS.includes(selectedProduct.name as any);
+  const isPackageProduct = selectedProduct && (selectedProduct.name.includes("Mascarilla") || selectedProduct.name.includes("Arañas") || selectedProduct.name.includes("Suspensiones"));
 
   const onSubmit = async (data: StockFormValues) => {
     try {
+      let finalQuantity = data.quantity;
+      if (isPackageProduct && selectedProduct?.name.includes("Mascarilla")) {
+        // 1 paquete = 40 unidades
+        finalQuantity = data.quantity * 40;
+      }
+
       if (editingStockId) {
         await updateStockMutation.mutateAsync({
           stockId: editingStockId,
-          quantity: data.quantity,
+          quantity: finalQuantity,
         });
         toast.success("Stock actualizado correctamente");
       } else {
         await createStockMutation.mutateAsync({
           productTypeId: data.productTypeId,
           color: data.color || "Estándar",
-          quantity: data.quantity,
+          quantity: finalQuantity,
         });
         toast.success("Stock registrado correctamente");
       }
@@ -228,20 +235,27 @@ export default function Stock() {
                     name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-foreground">
-                          Cantidad
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(Number(e.target.value))
-                            }
-                            className={formInputClass}
-                          />
-                        </FormControl>
+	                        <FormLabel className="text-foreground">
+	                          {isPackageProduct ? "Cantidad (en paquetes)" : "Cantidad (unidades)"}
+	                        </FormLabel>
+	                        <FormControl>
+	                          <div className="space-y-1">
+	                            <Input
+	                              type="number"
+	                              placeholder="0"
+	                              {...field}
+	                              onChange={(e) =>
+	                                field.onChange(Number(e.target.value))
+	                              }
+	                              className={formInputClass}
+	                            />
+	                            {isPackageProduct && selectedProduct?.name.includes("Mascarilla") && (
+	                              <p className="text-[10px] text-muted-foreground">
+	                                * 1 paquete = 40 unidades. Ingresa el número de paquetes.
+	                              </p>
+	                            )}
+	                          </div>
+	                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -276,67 +290,71 @@ export default function Stock() {
                 <CardTitle className="text-lg font-bold text-foreground">
                   {product.name}
                 </CardTitle>
-	                <p className="text-sm text-muted-foreground">
-	                  Total en stock:{" "}
-	                  <span className="font-bold text-[#E5A820]">
-	                    {stock.reduce((sum, s) => sum + s.quantity, 0)}
-	                  </span>
-	                </p>
-	              </CardHeader>
-	              <CardContent className="space-y-2 pb-5">
-	                {HELMET_PRODUCTS.includes(product.name as any) ? (
-	                  <div className="grid gap-2 sm:grid-cols-3">
-	                    {HELMET_COLORS.map((color) => {
-	                      const item = stock.find(
-	                        (s) => s.color.toLowerCase() === color.name.toLowerCase()
-	                      );
-	                      return (
-	                        <div
-	                          key={color.id}
-	                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
-	                        >
-	                          <div className="flex items-center gap-2.5">
-	                            <div
-	                              className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
-	                              style={{
-	                                backgroundColor: color.hex,
-	                              }}
-	                            />
-	                            <span className="text-sm font-medium text-foreground">
-	                              {color.id}. {color.name}
-	                            </span>
-	                          </div>
-	                          <span className="text-sm font-bold text-[#E5A820]">
-	                            {item?.quantity || 0}
-	                          </span>
-	                        </div>
-	                      );
-	                    })}
-	                  </div>
-	                ) : (
-	                  <div className="grid gap-2">
-	                    {stock.length > 0 ? (
-	                      stock.map((item) => (
-	                        <div
-	                          key={item.id}
-	                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
-	                        >
-	                          <span className="text-sm font-medium text-foreground">
-	                            {item.color}
-	                          </span>
-	                          <span className="text-sm font-bold text-[#E5A820]">
-	                            {item.quantity}
-	                          </span>
-	                        </div>
-	                      ))
-	                    ) : (
-	                      <div className="text-center py-4 text-muted-foreground text-sm">
-	                        Sin stock registrado
-	                      </div>
-	                    )}
-	                  </div>
-	                )}
-	              </CardContent>
+		                <p className="text-sm text-muted-foreground">
+		                  Total en stock:{" "}
+		                  <span className="font-bold text-[#E5A820]">
+		                    {product.name.includes("Mascarilla")
+		                      ? `${stock.reduce((sum, s) => sum + s.quantity, 0)} un. (${stock.reduce((sum, s) => sum + s.quantity, 0) / 40} paq.)`
+		                      : `${stock.reduce((sum, s) => sum + s.quantity, 0)} un.`}
+		                  </span>
+		                </p>
+		              </CardHeader>
+		              <CardContent className="space-y-2 pb-5">
+		                {HELMET_PRODUCTS.includes(product.name as any) ? (
+		                  <div className="grid gap-2 sm:grid-cols-3">
+		                    {HELMET_COLORS.map((color) => {
+		                      const item = stock.find(
+		                        (s) => s.color.toLowerCase() === color.name.toLowerCase()
+		                      );
+		                      return (
+		                        <div
+		                          key={color.id}
+		                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
+		                        >
+		                          <div className="flex items-center gap-2.5">
+		                            <div
+		                              className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
+		                              style={{
+		                                backgroundColor: color.hex,
+		                              }}
+		                            />
+		                            <span className="text-sm font-medium text-foreground">
+		                              {color.id}. {color.name}
+		                            </span>
+		                          </div>
+		                          <span className="text-sm font-bold text-[#E5A820]">
+		                            {item?.quantity || 0}
+		                          </span>
+		                        </div>
+		                      );
+		                    })}
+		                  </div>
+		                ) : (
+		                  <div className="grid gap-2">
+		                    {stock.length > 0 ? (
+		                      stock.map((item) => (
+		                        <div
+		                          key={item.id}
+		                          className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
+		                        >
+		                          <span className="text-sm font-medium text-foreground">
+		                            {item.color}
+		                          </span>
+		                          <span className="text-sm font-bold text-[#E5A820]">
+		                            {product.name.includes("Mascarilla") 
+		                              ? `${item.quantity} un. (${item.quantity / 40} paq.)`
+		                              : `${item.quantity} un.`}
+		                          </span>
+		                        </div>
+		                      ))
+		                    ) : (
+		                      <div className="text-center py-4 text-muted-foreground text-sm">
+		                        Sin stock registrado
+		                      </div>
+		                    )}
+		                  </div>
+		                )}
+		              </CardContent>
             </Card>
           ))}
         </div>
