@@ -35,6 +35,7 @@ export async function initializeProductTypes() {
   for (const d of defaults) {
     const existing = await db.select().from(productTypes).where(eq(productTypes.name, d.name)).limit(1);
     if (existing.length === 0) {
+      console.log(`Inicializando producto: ${d.name}`);
       await createProductType(d.name, d.description, d.imageUrl);
     }
   }
@@ -61,10 +62,12 @@ export async function initializeProductTypes() {
     for (const item of initialStock) {
       const existing = await getStockByProductTypeAndColor(item.productTypeId, item.color);
       if (!existing) {
+        console.log(`Inicializando stock: Producto ${item.productTypeId}, Color ${item.color}, Cantidad ${item.quantity}`);
         await createStockEntry(item.productTypeId, item.color, item.quantity);
       } else {
         // Solo actualizar si la cantidad es 0 o si es la primera vez (para no sobrescribir cambios del usuario)
         if (existing.quantity === 0 && item.quantity > 0) {
+          console.log(`Actualizando stock inicial: Producto ${item.productTypeId}, Color ${item.color}, Cantidad ${item.quantity}`);
           await updateStock(existing.id, item.quantity);
         }
       }
