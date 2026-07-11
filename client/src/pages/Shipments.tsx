@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Plus, Truck } from "lucide-react";
 import { toast } from "sonner";
-import { HELMET_COLORS, PRODUCT_NAMES } from "../const";
+import { HELMET_COLORS, HELMET_PRODUCTS } from "../const";
 import { Slider } from "@/components/ui/slider";
 
 const shipmentsFormSchema = z.object({
@@ -70,7 +70,7 @@ export default function Shipments() {
   };
 
   const isHelmetProduct = (productName: string) => {
-    return productName === PRODUCT_NAMES.JOCKEY || productName === PRODUCT_NAMES.MINERO;
+    return HELMET_PRODUCTS.includes(productName as any);
   };
 
   const getAvailableStock = (productTypeId: number, color?: string) => {

@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { PRODUCT_NAMES } from "../const";
+import { HELMET_PRODUCTS } from "../const";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Factory, Truck, TrendingUp, Package } from "lucide-react";

@@ -48,3 +48,11 @@ export const COLOR_HEX_MAP: Record<string, string> = {
 
 // Productos del casco (Jockey I y Minero)
 export const HELMET_PRODUCTS = ["Casco Jockey I", "Casco Minero"] as const;
+
+export const PRODUCT_NAMES = [
+  "Casco Minero",
+  "Casco Jockey I",
+  "Mascarillas Tipo AS",
+  "Arañas",
+  "Correas",
+] as const;

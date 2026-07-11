@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Plus, Factory, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { HELMET_COLORS, PRODUCT_NAMES } from "../const";
+import { HELMET_COLORS, HELMET_PRODUCTS } from "../const";
 import { Slider } from "@/components/ui/slider";
 
 const productionFormSchema = z.object({
@@ -153,7 +153,7 @@ export default function Production() {
   };
 
   const isHelmetProduct = (productName: string) => {
-    return productName === PRODUCT_NAMES.JOCKEY || productName === PRODUCT_NAMES.MINERO;
+    return HELMET_PRODUCTS.includes(productName as any);
   };
 
   const sortedProduction = [...(allProduction || [])].sort(
