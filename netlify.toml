@@ -1,3 +1,0 @@
-[build]
-  publish = "dist/public"
-  command = "pnpm build"
