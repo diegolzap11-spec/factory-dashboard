@@ -38,6 +38,33 @@ export async function initializeProductTypes() {
   for (const d of defaults) {
     await createProductType(d.name, d.description, d.imageUrl);
   }
+
+  // Carga de stock inicial solicitado por el usuario
+  const products = await getAllProductTypes();
+  const minero = products.find(p => p.name === "Casco Minero");
+  const mascarillas = products.find(p => p.name === "Mascarillas Tipo AS");
+  const aranas = products.find(p => p.name === "Arañas");
+
+  if (minero && mascarillas && aranas) {
+    const initialStock = [
+      { productTypeId: minero.id, color: "Naranja", quantity: 210 },
+      { productTypeId: minero.id, color: "Amarillo", quantity: 240 },
+      { productTypeId: minero.id, color: "Rojo", quantity: 360 },
+      { productTypeId: minero.id, color: "Blanco", quantity: 360 },
+      { productTypeId: minero.id, color: "Celeste", quantity: 1170 },
+      { productTypeId: mascarillas.id, color: "Estándar", quantity: 200 }, // 5 paquetes de 40u
+      { productTypeId: aranas.id, color: "Estándar", quantity: 26350 },
+    ];
+
+    for (const item of initialStock) {
+      const existing = await getStockByProductTypeAndColor(item.productTypeId, item.color);
+      if (!existing) {
+        await createStockEntry(item.productTypeId, item.color, item.quantity);
+      } else {
+        await updateStock(existing.id, item.quantity);
+      }
+    }
+  }
 }
 
 export async function initializeRawMaterialCategories() {
