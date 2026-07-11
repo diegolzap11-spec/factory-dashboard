@@ -4,6 +4,7 @@
   "type": "module",
   "license": "MIT",
   "description": "Sistema de Gestión de Producción e Inventario - Flexo Impress",
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
