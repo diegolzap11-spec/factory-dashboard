@@ -20,30 +20,30 @@ export function getProductImage(productName: string): string {
 
 // Colores para cascos en orden específico
 export const HELMET_COLORS = [
-  "blanco",
-  "amarillo",
-  "naranja",
-  "celeste",
-  "rojo",
-  "verde",
-  "azul",
-  "plomo",
-  "marrón",
+  { id: "1", name: "Blanco", hex: "#FFFFFF" },
+  { id: "2", name: "Amarillo", hex: "#FFFF00" },
+  { id: "3", name: "Azul", hex: "#0000FF" },
+  { id: "4", name: "Verde", hex: "#008000" },
+  { id: "5", name: "Rojo", hex: "#FF0000" },
+  { id: "6", name: "Naranja", hex: "#FFA500" },
+  { id: "7", name: "Gris", hex: "#808080" },
+  { id: "8", name: "Marrón", hex: "#A52A2A" },
+  { id: "9", name: "Dorado", hex: "#FFD700" },
 ] as const;
 
-export type HelmetColor = (typeof HELMET_COLORS)[number];
+export type HelmetColor = (typeof HELMET_COLORS)[number]["name"];
 
 // Mapeo de colores a valores visuales CSS
 export const COLOR_HEX_MAP: Record<string, string> = {
-  blanco: "#F5F5F5",
-  amarillo: "#FFD700",
-  naranja: "#FF8C00",
-  celeste: "#87CEEB",
-  rojo: "#DC143C",
-  verde: "#228B22",
-  azul: "#1E90FF",
-  plomo: "#808080",
-  marrón: "#8B4513",
+  "Blanco": "#FFFFFF",
+  "Amarillo": "#FFFF00",
+  "Azul": "#0000FF",
+  "Verde": "#008000",
+  "Rojo": "#FF0000",
+  "Naranja": "#FFA500",
+  "Gris": "#808080",
+  "Marrón": "#A52A2A",
+  "Dorado": "#FFD700",
 };
 
 // Productos del casco (Jockey I y Minero)

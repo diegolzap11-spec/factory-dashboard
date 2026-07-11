@@ -31,6 +31,7 @@ import {
   HELMET_PRODUCTS,
   getProductImage,
 } from "../const";
+import { Slider } from "@/components/ui/slider";
 
 const stockFormSchema = z.object({
   productTypeId: z.number(),
@@ -166,21 +167,42 @@ export default function Stock() {
                     name="color"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-foreground">Color</FormLabel>
+                        <FormLabel className="text-foreground">Color (1-9)</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            value={field.value}
-                            onChange={(e) => field.onChange(e.target.value)}
-                            className={formSelectClass}
-                          >
-                            <option value="">Selecciona un color</option>
-                            {HELMET_COLORS.map((color) => (
-                              <option key={color} value={color}>
-                                {color.charAt(0).toUpperCase() + color.slice(1)}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-4 py-2">
+                            <Slider
+                              min={1}
+                              max={9}
+                              step={1}
+                              value={[Number(HELMET_COLORS.find(c => c.name === field.value)?.id || 1)]}
+                              onValueChange={(vals) => {
+                                const color = HELMET_COLORS.find(c => c.id === vals[0].toString());
+                                if (color) field.onChange(color.name);
+                              }}
+                              className="py-4"
+                            />
+                            <div className="flex justify-between px-1">
+                              {HELMET_COLORS.map((color) => (
+                                <div
+                                  key={color.id}
+                                  className={`flex flex-col items-center gap-1 transition-all ${
+                                    field.value === color.name ? "scale-110" : "opacity-50"
+                                  }`}
+                                >
+                                  <div
+                                    className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
+                                    style={{ backgroundColor: color.hex }}
+                                  />
+                                  <span className="text-[10px] font-bold text-foreground">{color.id}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {field.value && (
+                              <div className="text-sm text-center font-medium text-[#E5A820]">
+                                Seleccionado: {field.value}
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -250,23 +272,22 @@ export default function Stock() {
                 <div className="grid gap-2 sm:grid-cols-3">
                   {HELMET_COLORS.map((color) => {
                     const item = stock.find(
-                      (s) => s.color.toLowerCase() === color.toLowerCase()
+                      (s) => s.color.toLowerCase() === color.name.toLowerCase()
                     );
                     return (
                       <div
-                        key={color}
+                        key={color.id}
                         className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl border border-border/30"
                       >
                         <div className="flex items-center gap-2.5">
                           <div
                             className="w-4 h-4 rounded-full border border-border/50 shadow-sm"
                             style={{
-                              backgroundColor:
-                                COLOR_HEX_MAP[color] || color.toLowerCase(),
+                              backgroundColor: color.hex,
                             }}
                           />
-                          <span className="text-sm font-medium text-foreground capitalize">
-                            {color}
+                          <span className="text-sm font-medium text-foreground">
+                            {color.id}. {color.name}
                           </span>
                         </div>
                         <span className="text-sm font-bold text-[#E5A820]">
